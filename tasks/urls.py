@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     RegisterView, LoginView, LogoutView, CurrentUserView, AdminUserView,
     TaskViewSet, TeamMemberViewSet, ChecklistItemViewSet, AttachmentViewSet,
-    DashboardStatsView, TaskExportView, TaskChecklistListView
+    DashboardStatsView, TaskExportView, TaskChecklistListView, UserReportView
 )
 
 # Create a router and register our ViewSets with it.
@@ -33,6 +33,9 @@ urlpatterns = [
     # We define this specifically here so it doesn't get caught by the router's
     # 'tasks/<id>/' pattern.
     path('tasks/export/', TaskExportView.as_view(), name='task-export'),
+
+    # User report export endpoint
+    path('users/report/', UserReportView.as_view(), name='user-report'),
 
     # ==============================
     # 4. ViewSet Routers (CRUD)

@@ -329,7 +329,7 @@ class DashboardStatsView(APIView):
 
 
 # =============================================================
-# 6. REPORTING VIEW (DOWNLOAD REPORT)
+# 6. REPORTING VIEWS (DOWNLOAD REPORTS)
 # =============================================================
 
 class TaskExportView(APIView):
@@ -347,7 +347,7 @@ class TaskExportView(APIView):
         # Implementation Note:
         # 1. Query the desired Task data (e.g., all tasks).
         tasks = Task.objects.all().order_by('id')
-        
+
         # 2. Prepare the HTTP Response headers for file download.
         import csv
         from django.http import HttpResponse
@@ -356,12 +356,12 @@ class TaskExportView(APIView):
         response['Content-Disposition'] = 'attachment; filename="task_report.csv"'
 
         writer = csv.writer(response)
-        
+
         # Headers for the CSV file
         writer.writerow([
-            'Task ID', 'Title', 'Priority', 'Status', 
-            'Due Date', 'Created By', 'Assigned To', 
-            'Checklist Items', 'Completed Checklists', 
+            'Task ID', 'Title', 'Priority', 'Status',
+            'Due Date', 'Created By', 'Assigned To',
+            'Checklist Items', 'Completed Checklists',
             'Attachment Count'
         ])
 
@@ -370,23 +370,85 @@ class TaskExportView(APIView):
             assigned_members = ", ".join([user.username for user in task.assigned_to.all()])
             checklist_total = task.checklist.count()
             checklist_completed = task.checklist.filter(is_completed=True).count()
-            
+
             writer.writerow([
-                task.id, 
-                task.title, 
-                task.priority, 
+                task.id,
+                task.title,
+                task.priority,
                 task.status,
-                task.due_date, 
-                task.created_by.username, 
-                assigned_members, 
+                task.due_date,
+                task.created_by.username,
+                assigned_members,
                 checklist_total,
                 checklist_completed,
                 task.attachments.count()
             ])
-            
+
         # The frontend requirement specifies Excel, but a CSV file
         # is the most straightforward way to implement server-side
         # file generation without external libraries like pandas or openpyxl.
         # Most spreadsheet programs (Excel, Sheets) easily open CSV files.
+
+        return response
+
+
+class UserReportView(APIView):
+    """
+    Generates an exportable CSV report of users and their task statistics.
+    Shows username, email, and task distribution (total, pending, in progress, completed).
+    Only accessible by Admins.
+    """
+    permission_classes = [IsAuthenticated] # Check custom admin status inside
+
+    def get(self, request):
+        # Check if user is admin or superuser
+        if not (request.user.is_admin or request.user.is_superuser):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Only administrators can export user reports.")
+
+        # Import required modules
+        import csv
+        from django.http import HttpResponse
+        from django.db.models import Count, Q
+
+        # Get all active users
+        users = User.objects.all()
+
+        # Create the HTTP response with CSV header
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="user_task_report.csv"'
+
+        writer = csv.writer(response)
+
+        # Write header row
+        writer.writerow([
+            'Username',
+            'Email',
+            'Total Tasks Assigned',
+            'Pending Tasks',
+            'In Progress Tasks',
+            'Completed Tasks'
+        ])
+
+        # Generate task statistics for each user
+        for user in users:
+            # Get all tasks assigned to this user
+            user_tasks = Task.objects.filter(assigned_to=user)
+
+            # Calculate task counts by status
+            total_tasks = user_tasks.count()
+            pending_tasks = user_tasks.filter(status='PENDING').count()
+            inprogress_tasks = user_tasks.filter(status='IN_PROGRESS').count()
+            completed_tasks = user_tasks.filter(status='COMPLETED').count()
+
+            # Write the user's data row
+            writer.writerow([
+                user.username,
+                user.email,
+                total_tasks,
+                pending_tasks,
+                inprogress_tasks,
+                completed_tasks
+            ])
 
         return response
