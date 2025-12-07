@@ -10,7 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile_picture', 'is_admin']
+        fields = ['id', 'full_name', 'email', 'profile_picture', 'is_admin']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -22,15 +22,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'first_name', 'last_name']
+        fields = ['full_name', 'email', 'password']
 
     def create(self, validated_data):
         user = User.objects.create_user(
-            username=validated_data['username'],
             email=validated_data['email'],
             password=validated_data['password'],
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', '')
+            full_name=validated_data.get('full_name', '')
         )
         return user
 
@@ -51,15 +49,16 @@ class LoginSerializer(serializers.Serializer):
     """
     Serializer for user login authentication.
     """
-    username = serializers.CharField()
+    email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        username = attrs.get('username')
+        email = attrs.get('email')
         password = attrs.get('password')
 
-        if username and password:
-            user = authenticate(username=username, password=password)
+        if email and password:
+            # Authenticate using email instead of username
+            user = authenticate(email=email, password=password)
 
             if not user:
                 raise serializers.ValidationError('Invalid credentials. Please try again.')
@@ -70,7 +69,7 @@ class LoginSerializer(serializers.Serializer):
             attrs['user'] = user
             return attrs
         else:
-            raise serializers.ValidationError('Both username and password are required.')
+            raise serializers.ValidationError('Both email and password are required.')
 
 
 class TaskSerializer(serializers.ModelSerializer):

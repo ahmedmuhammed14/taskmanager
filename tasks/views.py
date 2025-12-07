@@ -51,11 +51,11 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        username = serializer.validated_data['username']
+
+        email = serializer.validated_data['email']
         password = serializer.validated_data['password']
 
-        user = authenticate(username=username, password=password)
+        user = authenticate(email=email, password=password)
 
         if user:
             # Get or create token (using DRF Token authentication)
@@ -63,10 +63,11 @@ class LoginView(APIView):
             return Response({
                 'token': token.key,
                 'user_id': user.pk,
-                'username': user.username,
+                'full_name': user.full_name,
+                'email': user.email,
                 'is_admin': user.is_admin,
             }, status=status.HTTP_200_OK)
-        
+
         return Response(
             {"detail": "Invalid credentials. Please try again."},
             status=status.HTTP_401_UNAUTHORIZED
@@ -132,7 +133,7 @@ class AdminUserView(APIView):
         user.save()
 
         return Response(
-            {"detail": f"User {user.username} is now an admin."},
+            {"detail": f"User {user.full_name or user.email} is now an admin."},
             status=status.HTTP_200_OK
         )
 
@@ -146,7 +147,7 @@ class TeamMemberViewSet(viewsets.ReadOnlyModelViewSet):
     Provides read-only access to all users (Team Members).
     Accessible by authenticated users for assignment/team list.
     """
-    queryset = User.objects.all().order_by('username')
+    queryset = User.objects.all().order_by('full_name')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
@@ -284,34 +285,34 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 
 class DashboardStatsView(APIView):
     """
-    API to provide task counts for the dashboard statistics cards.
-    Handles filtering based on Admin vs. Team Member role.
+    API to provide summary counts and recent tasks for the dashboard.
+    Refactored to exclude chart data (moved to dedicated endpoints).
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
         
-        # Start with the base queryset for the current user's scope
+        # 1. Determine Scope based on Role
         if user.is_admin:
             base_queryset = Task.objects.all()
         else:
             base_queryset = Task.objects.filter(assigned_to=user)
 
-        # 1. Quick Task Summary (Top Cards)
+        # 2. Quick Task Summary (Top Cards)
+        # Using .count() is efficient as it hits the DB count directly
         total_count = base_queryset.count()
         pending_count = base_queryset.filter(status='PENDING').count()
         in_progress_count = base_queryset.filter(status='IN_PROGRESS').count()
         completed_count = base_queryset.filter(status='COMPLETED').count()
 
-        # 2. Distribution Chart Data (by Status)
+        # 3. Distribution Chart Data (by Status)
         status_distribution = base_queryset.values('status').annotate(count=Count('status'))
-        
-        # 3. Priority Chart Data (by Priority)
+
+        # 4. Priority Chart Data (by Priority)
         priority_distribution = base_queryset.values('priority').annotate(count=Count('priority'))
 
-        # 4. Recent Tasks (Bottom Table)
-        # Uses the TaskSerializer for detailed output
+        # 5. Recent Tasks (Bottom Table)
         recent_tasks = base_queryset.order_by('-created_at')[:10]
         recent_tasks_data = TaskSerializer(recent_tasks, many=True).data
 
@@ -367,7 +368,7 @@ class TaskExportView(APIView):
 
         # Write data rows
         for task in tasks:
-            assigned_members = ", ".join([user.username for user in task.assigned_to.all()])
+            assigned_members = ", ".join([user.full_name or user.email for user in task.assigned_to.all()])
             checklist_total = task.checklist.count()
             checklist_completed = task.checklist.filter(is_completed=True).count()
 
@@ -377,7 +378,7 @@ class TaskExportView(APIView):
                 task.priority,
                 task.status,
                 task.due_date,
-                task.created_by.username,
+                task.created_by.full_name or task.created_by.email,
                 assigned_members,
                 checklist_total,
                 checklist_completed,
@@ -422,7 +423,7 @@ class UserReportView(APIView):
 
         # Write header row
         writer.writerow([
-            'Username',
+            'Full Name',
             'Email',
             'Total Tasks Assigned',
             'Pending Tasks',
@@ -443,7 +444,7 @@ class UserReportView(APIView):
 
             # Write the user's data row
             writer.writerow([
-                user.username,
+                user.full_name or user.email,
                 user.email,
                 total_tasks,
                 pending_tasks,

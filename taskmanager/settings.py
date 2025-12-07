@@ -40,12 +40,14 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
+    'corsheaders',
     # Local apps
     'tasks.apps.TasksConfig',
 
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,6 +55,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173", # If using Vite
 ]
 
 ROOT_URLCONF = 'taskmanager.urls'
@@ -129,6 +135,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
 AUTH_USER_MODEL = 'tasks.User'
+
+# Authentication backends - allow email authentication
+AUTHENTICATION_BACKENDS = [
+    'tasks.authentication.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',  # Keep the default backend as fallback
+]
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
