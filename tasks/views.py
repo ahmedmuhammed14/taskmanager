@@ -32,11 +32,13 @@ class RegisterView(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         # Allow registration only if no superusers exist, or if an admin is already logged in
-        if User.objects.filter(is_superuser=True).exists() and not request.user.is_authenticated:
-            return Response(
-                {"detail": "Registration is currently closed."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Commenting out the restriction to allow registration even with existing superusers
+        # if User.objects.filter(is_superuser=True).exists() and not request.user.is_authenticated:
+        #     return Response(
+        #         {"detail": "Registration is currently closed."},
+        #         status=status.HTTP_403_FORBIDDEN
+        #     )
+
         # If registration is allowed, by default the new user is a team member (not admin)
         return super().post(request, *args, **kwargs)
 
@@ -177,8 +179,8 @@ class TaskViewSet(viewsets.ModelViewSet):
         if user.is_admin:
             return queryset
 
-        # Team Member View: Show all tasks (as per requirements)
-        return queryset.all()
+        # Team Member View: Show only tasks assigned to them
+        return queryset.filter(assigned_to=user)
 
     def perform_create(self, serializer):
         """Sets the created_by field to the currently logged-in user."""
